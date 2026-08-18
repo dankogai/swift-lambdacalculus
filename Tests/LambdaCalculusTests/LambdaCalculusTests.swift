@@ -150,3 +150,52 @@ import Testing
         #expect(fact(Church.numeral(5)).normalized(maxSteps: 1_000_000)!.churchInt == 120)
     }
 }
+
+@Suite struct CombinatorTests {
+    @Test func parsing() throws {
+        #expect(try Combinator("SKKx") == Combinator.s(.k, .k, .variable("x")))
+        #expect(try Combinator("S(K(SI))K") == Combinator.s(Combinator.k(Combinator.s(.i)), .k))
+        #expect(try Combinator("ι x'") == Combinator.iota(.variable("x'")))
+        // bind to a variable: a bare literal would pick init(stringLiteral:), which traps
+        for source: String in ["λx.x", "\\x.x", "(SK", "", "?"] {
+            #expect(throws: ParseError.self) { try Combinator(source) }
+        }
+    }
+
+    @Test func descriptionRoundTrips() throws {
+        for source in ["S", "SKKx", "S(K(SI))K", "ιι", "X(XX)", "B(CW)K", "x'y"] {
+            let term = try Combinator(source)
+            #expect(try Combinator(term.description) == term)
+        }
+        #expect(Combinator("S(K(SI))K").description == "S(K(SI))K")
+        // multi-character pieces get separating spaces, as in swift-combinators
+        #expect(Combinator.apply(.variable("x'"), .variable("y")).description == "x' y")
+    }
+
+    @Test func primitiveLaws() throws {
+        let x: Term = "x", y: Term = "y", z: Term = "z"
+        #expect(Term(Combinator.s)(x, y, z).normalized() == Term("x z (y z)"))
+        #expect(Term(Combinator.k)(x, y).normalized() == x)
+        #expect(Term(Combinator.i)(x).normalized() == x)
+        #expect(Term(Combinator.b)(x, y, z).normalized() == Term("x (y z)"))
+        #expect(Term(Combinator.c)(x, y, z).normalized() == Term("x z y"))
+        #expect(Term(Combinator.w)(x, y).normalized() == Term("x y y"))
+    }
+
+    @Test func classicPrograms() throws {
+        // SKK is the identity
+        #expect(try Term(combinator: "SKK").normalized()!.isAlphaEquivalent(to: "λx.x"))
+        // S(K(SI))K flips its arguments
+        let flip = try Term(combinator: "S(K(SI))K")
+        #expect(flip("x", "y").normalized() == Term("y x"))
+        // swift-combinators compiles λfx.f(fx) to this; it decodes back to 2
+        #expect(try Term(combinator: "S(S(KS)K)(S(S(KS)K)(KI))").normalized()!.churchInt == 2)
+    }
+
+    @Test func onePointBases() throws {
+        // ιι = I, and K and S are recovered from X as XXX and X(XX)
+        #expect(try Term(combinator: "ιι").normalized()!.isAlphaEquivalent(to: "λa.a"))
+        #expect(try Term(combinator: "XXX").normalized()!.isAlphaEquivalent(to: Term(Combinator.k)))
+        #expect(try Term(combinator: "X(XX)").normalized()!.isAlphaEquivalent(to: Term(Combinator.s)))
+    }
+}

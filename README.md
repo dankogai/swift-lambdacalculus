@@ -27,6 +27,12 @@ let two = Church.numeral(2), three = Church.numeral(3)
 Church.plus(two, three).normalized()!.churchInt       // Optional(5)
 Church.isZero(two).normalized()!.churchBool           // Optional(false)
 
+// combinator calculus interop: classic notation parses and expands to λ
+let flip = try Term(combinator: "S(K(SI))K")      // Sabc = ac(bc), Kab = a, Ia = a
+flip("x", "y").normalized()                       // Optional(y x)
+try Term(combinator: "SKK").normalized()!
+    .isAlphaEquivalent(to: "λx.x")                // true
+
 // recursion via the fixed-point combinator
 let fact = Church.fix(
     .lambda("f", "n", body:
@@ -57,6 +63,7 @@ public indirect enum Term: Hashable, Sendable {
 - **Substitution** — `substituting(_:with:)` is capture-avoiding; bound variables are freshened with primes (`x` → `x'`) when needed.
 - **Reduction** — `reducedOnce` performs a single normal-order (leftmost-outermost) β-step, `reductionSequence` traces every step, and `normalized(maxSteps:)` reduces to β-normal form efficiently, returning `nil` if the step budget is exhausted. Normal order is normalizing, so a normal form is found whenever one exists — which is what makes `Church.ifThenElse` lazy and `Church.fix` usable.
 - **Church encodings** — `Church` provides booleans (`true`, `false`, `and`, `or`, `not`, `ifThenElse`), numerals (`numeral(_:)`, `succ`, `plus`, `times`, `power`, `pred`, `isZero`), and the fixed-point combinator `fix`. Decode normal forms back with `.churchInt` and `.churchBool`.
+- **Combinator calculus** — `Combinator` speaks the classic notation of [swift-combinators](https://github.com/dankogai/swift-combinators) (`S`, `K`, `I`, `B`, `C`, `W`, `ι`, `X`, juxtaposition, e.g. `"S(K(SI))K"`), printing and parsing identically. `Term.init(_:)` expands each primitive into the same defining abstraction that package uses for its reverse lifting, so the two are interchangeable: swift-combinators compiles λ → combinator by bracket abstraction, and this package converts combinator → λ.
 
 ## Usage
 
