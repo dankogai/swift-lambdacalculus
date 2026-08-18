@@ -65,6 +65,30 @@ public indirect enum Term: Hashable, Sendable {
 - **Church encodings** — `Church` provides booleans (`true`, `false`, `and`, `or`, `not`, `ifThenElse`), numerals (`numeral(_:)`, `succ`, `plus`, `times`, `power`, `pred`, `isZero`), and the fixed-point combinator `fix`. Decode normal forms back with `.churchInt` and `.churchBool`.
 - **Combinator calculus** — `Combinator` speaks the classic notation of [swift-combinators](https://github.com/dankogai/swift-combinators) (`S`, `K`, `I`, `B`, `C`, `W`, `ι`, `X`, juxtaposition, e.g. `"S(K(SI))K"`), printing and parsing identically. `Term.init(_:)` expands each primitive into the same defining abstraction that package uses for its reverse lifting, so the two are interchangeable: swift-combinators compiles λ → combinator by bracket abstraction, and this package converts combinator → λ.
 
+## The `lambda` REPL
+
+The package ships an executable, the mirror image of swift-combinators' `ski`:
+
+```sh
+swift run lambda                     # interactive
+swift run lambda '(λx.x) y'         # evaluate one expression
+swift run lambda -v 'succ zero'      # show every reduction step
+```
+
+```
+λ> plus two three
+λf.λx.f (f (f (f (f x))))    -- 5
+λ> fix (λf.λn.if (iszero n) one (times n (f (pred n)))) three
+λf.λx.f (f (f (f (f (f x)))))    -- 6
+λ> :ski S(K(SI))Kab
+b a
+```
+
+Church numerals (`zero` … `nine`), arithmetic, booleans, `fix`, and the
+combinators `S K I B C W` are predefined; `:let name = <expr>` binds more.
+`:v` traces every step, `:ski` evaluates classic combinator notation via its
+λ-image, and `:help` lists the rest.
+
 ## Usage
 
 ### Swift Package Manager
