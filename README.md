@@ -65,6 +65,39 @@ public indirect enum Term: Hashable, Sendable {
 - **Church encodings** — `Church` provides booleans (`true`, `false`, `and`, `or`, `not`, `ifThenElse`), numerals (`numeral(_:)`, `succ`, `plus`, `times`, `power`, `pred`, `isZero`), and the fixed-point combinator `fix`. Decode normal forms back with `.churchInt` and `.churchBool`.
 - **Combinator calculus** — `Combinator` speaks the classic notation of [swift-combinators](https://github.com/dankogai/swift-combinators) (`S`, `K`, `I`, `B`, `C`, `W`, `ι`, `X`, juxtaposition, e.g. `"S(K(SI))K"`), printing and parsing identically. `Term.init(_:)` expands each primitive into the same defining abstraction that package uses for its reverse lifting, so the two are interchangeable: swift-combinators compiles λ → combinator by bracket abstraction, and this package converts combinator → λ.
 
+## Design notes
+
+- **How `normalized` stays fast.** Iterating `reducedOnce` re-searches the whole
+  term from the root for every step — O(steps × size). `normalized(maxSteps:)`
+  instead reduces the head along the application spine to weak-head normal form
+  and then normalizes the remaining subterms. The strategy is still
+  leftmost-outermost, so it reaches the same normal forms; only the traversal
+  differs. Fuel counts β-steps, so the count can differ slightly from the
+  single-step path. On the factorial benchmark (5! via `fix`) this plus the
+  substitution fix below took the test suite from 92s to under 4s.
+- **Substitution computes free variables once.** `substituting(_:with:)`
+  determines the replacement term's free-variable set a single time and threads
+  it through the traversal. Recomputing it at every abstraction node — the
+  obvious recursive formulation — makes substitution quadratic in term size,
+  which dominates everything once Church-encoded terms grow.
+- **String literals trap; `init(_:)` throws — and literals pick the trap.**
+  `let id: Term = "λx.x"` parses at initialization and traps on malformed
+  input, while `try Term(source)` throws `ParseError`. But Swift resolves
+  `Term("λx.x")` with a *bare literal* argument to the literal initializer too,
+  so it traps rather than throws — even under `try`. To exercise the throwing
+  parser (e.g. when testing malformed input), bind the source to a `String`
+  first. The same holds for `Combinator`.
+- **Interchange with swift-combinators is by notation, not by dependency.**
+  Both packages parse and print the same classic combinator notation, and
+  `Term.init(_:)` uses the same primitive-expansion table as that package's
+  reverse lifting, so terms travel between them as strings with no code
+  dependency either way. The division of labor: λ → combinator (bracket
+  abstraction) lives there; combinator → λ lives here. One asymmetry: this
+  package's identifiers are words (`plus`, `iszero`), swift-combinators'
+  variables are single letters — so the REPLs share semantics, not vocabulary.
+- **Decoding is ambiguous at 0.** `λt.λf.f` is both the Church numeral 0 and
+  Church `false`, so the REPL annotates it `-- 0, false`. This mirrors `ski`.
+
 ## The `lambda` REPL
 
 The package ships an executable, the mirror image of swift-combinators' `ski`:
